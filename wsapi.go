@@ -45,6 +45,27 @@ type resumePacket struct {
 	} `json:"d"`
 }
 
+// SetResumeState injects a previously-persisted gateway session so that the
+// next call to Open() attempts a RESUME instead of a fresh IDENTIFY.
+//
+// Call this before Open(). If the RESUME is rejected by Discord (op 9
+// INVALID_SESSION), discordgo falls back to IDENTIFY automatically inside
+// onEvent -- no caller action is required.
+//
+// sessionID is treated as a credential and must not be logged by callers.
+// resumeGatewayURL, when non-empty, replaces the cached gateway endpoint so
+// the reconnect goes to the shard-local URL Discord provided in the previous
+// READY payload.
+func (s *Session) SetResumeState(sessionID string, sequence int64, resumeGatewayURL string) {
+	s.Lock()
+	defer s.Unlock()
+	s.sessionID = sessionID
+	atomic.StoreInt64(s.sequence, sequence)
+	if resumeGatewayURL != "" {
+		s.gateway = resumeGatewayURL
+	}
+}
+
 // Open creates a websocket connection to Discord.
 // See: https://discord.com/developers/docs/topics/gateway#connecting
 func (s *Session) Open() error {
